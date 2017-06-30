@@ -138,7 +138,7 @@ export default {
       gateway: null,
       buyRate: null,
       sellRate: null,
-      orderTotal: null,
+      orderTotal: null, // 订单量
       limitCNY: null,
       limitXRP: null
     }
@@ -153,7 +153,18 @@ export default {
   },
   methods: {
     save (e) {
-
+      let mem = {
+        myAddress: this.myAddress,
+        primaryKey: this.primaryKey,
+        gateway: this.gateway,
+        buyRate: this.buyRate,
+        sellRate: this.sellRate,
+        orderTotal: this.orderTotal,
+        limitCNY: this.limitCNY,
+        limitXRP: this.limitXRP
+      }
+      localStorage.mem = JSON.stringify(mem)
+      this.msgOpen('保存成功', 'success')
     },
     onMsg (e) {
       let data = JSON.parse(e.data)
@@ -164,9 +175,27 @@ export default {
         default:
           break
       }
+    },
+    msgOpen (msg, msgType = 'success') {
+      this.$message({
+        message: msg,
+        type: msgType
+      })
     }
   },
   mounted () {
+    // load config if exist
+    if (localStorage.mem !== undefined) {
+      let localMem = JSON.parse(localStorage.mem)
+      this.myAddress = localMem.myAddress
+      this.primaryKey = localMem.primaryKey
+      this.gateway = localMem.gateway
+      this.buyRate = localMem.buyRate
+      this.sellRate = localMem.sellRate
+      this.orderTotal = localMem.orderTotal
+      this.limitCNY = localMem.limitCNY
+      this.limitXRP = localMem.limitXRP
+    }
     this.ws = new WebSocket('wss://s1.ripple.com')
     let that = this
     this.ws.onopen = () => {
