@@ -156,7 +156,14 @@ export default {
 
     },
     onMsg (e) {
-      console.log('onMsg:', e)
+      let data = JSON.parse(e.data)
+      switch (data.id) {
+        case 1:
+          Vue.Ripple.pong(this, data)
+          break
+        default:
+          break
+      }
     }
   },
   mounted () {
@@ -176,7 +183,7 @@ export default {
     this.ws.onmessage = this.onMsg
     setInterval(() => {
       Vue.Ripple.ping(that.ws)
-    }, 5000)
+    }, 10 * 1000)
   }
 }
 </script>

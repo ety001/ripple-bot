@@ -7,8 +7,10 @@ const install = (Vue, options = {}) => {
       }
       ws.send(JSON.stringify(pingCommand))
     },
-    pong: component => {
-
+    pong: (component, data) => {
+      if (data.status !== 'success') {
+        component.ws.close()
+      }
     }
   }
 }
