@@ -10,21 +10,11 @@ Vue.use(ElementUI)
 Vue.config.productionTip = false
 
 /* eslint-disable no-new */
-var app = new Vue({
+new Vue({
   el: '#app',
   render: h => h(App),
   router,
   template: '<App/>',
   components: { App },
-  data: {
-    ws: null,
-    wsStatus: false
-  },
-  mounted () {
-    this.ws = new WebSocket('wss://s1.ripple.com')
-    this.ws.onopen = () => {
-      app.wsStatus = true
-      console.log('on open')
-    }
-  }
+  data: {}
 })
