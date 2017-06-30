@@ -117,6 +117,11 @@
 </template>
 
 <script>
+import Vue from 'vue'
+import Ripple from '@/Lib/Ripple'
+
+Vue.use(Ripple)
+
 export default {
   name: 'home',
   data () {
@@ -149,6 +154,9 @@ export default {
   methods: {
     save (e) {
 
+    },
+    onMsg (e) {
+      console.log('onMsg:', e)
     }
   },
   mounted () {
@@ -159,6 +167,16 @@ export default {
       that.connectStatusText = '已连接'
       console.log('websocket is on open!')
     }
+    this.ws.onclose = () => {
+      that.connectStatus = false
+      that.connectStatusText = '未连接'
+      console.log('websocket is closed! Reconnecting...')
+      that.ws = new WebSocket('wss://s1.ripple.com')
+    }
+    this.ws.onmessage = this.onMsg
+    setInterval(() => {
+      Vue.Ripple.ping(that.ws)
+    }, 5000)
   }
 }
 </script>
