@@ -2,7 +2,7 @@ const install = (Vue, options = {}) => {
   Vue.Ripple = {
     ping: ws => {
       const pingCommand = {
-        'id': 1,
+        'id': 'ping_pong',
         'command': 'ping'
       }
       ws.send(JSON.stringify(pingCommand))
@@ -12,7 +12,7 @@ const install = (Vue, options = {}) => {
         component.ws.close()
       }
     },
-    sellOrderBook: (ws, component, limit = 10) => {
+    sellOrderBook: (component, limit = 10) => {
       let command = {
         'id': 12,
         'command': 'book_offers',
@@ -26,9 +26,9 @@ const install = (Vue, options = {}) => {
         },
         'limit': limit
       }
-      ws.send(JSON.stringify(command))
+      component.ws.send(JSON.stringify(command))
     },
-    buyOrderBook: (ws, component, limit = 10) => {
+    buyOrderBook: (component, limit = 10) => {
       let command = {
         'id': 12,
         'command': 'book_offers',
@@ -42,9 +42,9 @@ const install = (Vue, options = {}) => {
         },
         'limit': limit
       }
-      ws.send(JSON.stringify(command))
+      component.ws.send(JSON.stringify(command))
     },
-    subscribeBooks: (ws, component) => {
+    subscribeBooks: (component) => {
       let command = {
         'id': 'xrp_cny_order_book',
         'command': 'subscribe',
@@ -62,9 +62,9 @@ const install = (Vue, options = {}) => {
           }
         ]
       }
-      ws.send(JSON.stringify(command))
+      component.ws.send(JSON.stringify(command))
     },
-    unsubscribeBooks: (ws, component) => {
+    unsubscribeBooks: (component) => {
       let command = {
         'id': 'xrp_cny_order_book',
         'command': 'subscribe',
@@ -82,7 +82,16 @@ const install = (Vue, options = {}) => {
           }
         ]
       }
-      ws.send(JSON.stringify(command))
+      component.ws.send(JSON.stringify(command))
+    },
+    txStatus: (component, transaction) => {
+      let command = {
+        'id': 'tx_status',
+        'command': 'tx',
+        'transaction': transaction,
+        'binary': false
+      }
+      component.ws.send(JSON.stringify(command))
     }
   }
 }
