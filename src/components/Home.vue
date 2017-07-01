@@ -22,13 +22,10 @@
         </el-col>
       </el-row>
       <!-- content -->
-      <el-row>
-        <el-col :span="12">
-          
-        </el-col>
-        <el-col :span="12">
+      <el-row :gutter="12">
+        <el-col :span="8">
           <div class="info">
-            <span>当前成交价(CNY/XRP)：</span>
+            <span>当前成交价(XRP/CNY)：</span>
             <el-tag type="success">{{ price }}</el-tag>
           </div>
           <div class="info">
@@ -65,7 +62,7 @@
           </div>
           <div class="info">
             <span>私钥：</span>
-            <el-input v-model="primaryKey" placeholder="私钥"></el-input>
+            <el-input type="password" v-model="primaryKey" placeholder="私钥"></el-input>
           </div>
           <div class="info">
             <span>网关：</span>
@@ -106,10 +103,81 @@
               </el-col>
               <el-col :span="8">
                 <br><br>
-                <el-button type="primary" @click="save">保存到本地缓存</el-button>
+                <el-button type="primary" @click="save">保存配置</el-button>
               </el-col>
             </el-row>
           </div>
+        </el-col>
+        <el-col :span="16">
+          <h4>Offsers List</h4>
+          <el-row :gutter="8">
+            <el-col :span="12">
+              <el-table
+                :data="bids"
+                stripe
+                style="width: 100%">
+                <el-table-column
+                  prop="atype"
+                  label="类型">
+                </el-table-column>
+                <el-table-column
+                  prop="amount"
+                  label="数量(XRP)"
+                  width="180">
+                </el-table-column>
+                <el-table-column
+                  prop="price"
+                  label="价格(CNY)"
+                  width="180">
+                </el-table-column>
+              </el-table>
+            </el-col>
+            <el-col :span="12">
+              <el-table
+                :data="asks"
+                stripe
+                style="width: 100%">
+                <el-table-column
+                  prop="price"
+                  label="价格(CNY)"
+                  width="180">
+                </el-table-column>
+                <el-table-column
+                  prop="amount"
+                  label="数量(XRP)"
+                  width="180">
+                </el-table-column>
+                <el-table-column
+                  prop="atype"
+                  label="类型">
+                </el-table-column>
+              </el-table>
+            </el-col>
+          </el-row>
+          <h4>Transactions</h4>
+          <el-row>
+            <el-col :span="24">
+              <el-table
+                :data="transactions"
+                stripe
+                style="width: 100%">
+                <el-table-column
+                  prop="amount"
+                  label="数量(XRP)"
+                  width="180">
+                </el-table-column>
+                <el-table-column
+                  prop="price"
+                  label="价格(CNY)"
+                  width="180">
+                </el-table-column>
+                <el-table-column
+                  prop="atype"
+                  label="类型">
+                </el-table-column>
+              </el-table>
+            </el-col>
+          </el-row>
         </el-col>
       </el-row>
     </el-col>
@@ -126,7 +194,9 @@ export default {
   name: 'home',
   data () {
     return {
+      interval: null,
       ws: null,
+      connectting: false,
       connectStatus: false,
       connectStatusText: '未连接',
       robotStatus: false,
@@ -140,7 +210,10 @@ export default {
       sellRate: null,
       orderTotal: null, // 订单量
       limitCNY: null,
-      limitXRP: null
+      limitXRP: null,
+      asks: [],
+      bids: [],
+      transactions: []
     }
   },
   computed: {
@@ -168,19 +241,77 @@ export default {
     },
     onMsg (e) {
       let data = JSON.parse(e.data)
-      switch (data.id) {
-        case 1:
-          Vue.Ripple.pong(this, data)
-          break
-        default:
-          break
+      console.log('ws:', data)
+      if (data.type === 'response') {
+        switch (data.id) {
+          case 1:
+            Vue.Ripple.pong(this, data)
+            break
+          case 'xrp_cny_order_book':
+            this.orderbook(data)
+            break
+          default:
+            break
+        }
+      } else if (data.type === 'transaction') {
+        this.transaction(data)
       }
     },
     msgOpen (msg, msgType = 'success') {
-      this.$message({
-        message: msg,
-        type: msgType
+      switch (msgType) {
+        case 'error':
+          this.$message.error(msg)
+          console.error(msg)
+          break
+        case 'success':
+        case 'warning':
+          this.$message({
+            message: msg,
+            type: msgType
+          })
+          console.log(msg)
+          break
+        default:
+          this.$message(msg)
+          console.log(msg)
+          break
+      }
+    },
+    fixNum (val, limit = 3) {
+      return val.toFixed(limit)
+    },
+    orderbook (data) {
+      let asks = data.result ? data.result.asks.slice(0, 15) : []
+      let bids = data.result ? data.result.bids.slice(0, 15) : []
+      let that = this
+      asks.forEach((val, index, arr) => {
+        that.asks.push({
+          'amount': val.TakerGets / 1000000,
+          'price': that.fixNum(val.TakerPays.value / (val.TakerGets / 1000000), 3),
+          'atype': 'Sell'
+        })
       })
+      bids.forEach((val, index, arr) => {
+        that.bids.push({
+          'amount': val.TakerPays / 1000000,
+          'price': that.fixNum(val.TakerGets.value / (val.TakerPays / 1000000), 3),
+          'atype': 'Buy'
+        })
+      })
+    },
+    transaction (data) {
+      let detail = data.transaction
+      if (detail.TransactionType === 'OfferCancel') {
+        return
+      }
+      this.transactions.unshift({
+        'amount': typeof detail.TakerPays === 'string' ? detail.TakerPays / 1000000 : detail.TakerGets / 1000000,
+        'price': this.fixNum(typeof detail.TakerPays === 'string' ? detail.TakerGets.value / (detail.TakerPays / 1000000) : detail.TakerPays.value / (detail.TakerGets / 1000000), 3),
+        'atype': typeof detail.TakerPays === 'string' ? 'Sell' : 'Buy'
+      })
+      if (this.transactions.length > 30) {
+        this.transactions.pop()
+      }
     }
   },
   mounted () {
@@ -196,23 +327,36 @@ export default {
       this.limitCNY = localMem.limitCNY
       this.limitXRP = localMem.limitXRP
     }
+    // connect ws
     this.ws = new WebSocket('wss://s1.ripple.com')
     let that = this
     this.ws.onopen = () => {
+      that.connectting = false
       that.connectStatus = true
       that.connectStatusText = '已连接'
+      that.interval = setInterval(() => {
+        Vue.Ripple.ping(that.ws)
+      }, 10 * 1000)
       console.log('websocket is on open!')
+      Vue.Ripple.subscribeBooks(that.ws, that)
     }
     this.ws.onclose = () => {
       that.connectStatus = false
       that.connectStatusText = '未连接'
+      clearInterval(that.interval)
       console.log('websocket is closed! Reconnecting...')
-      that.ws = new WebSocket('wss://s1.ripple.com')
+      // reconnect
+      let tmpInterval = setInterval(() => {
+        if (that.connectStatus === false && that.connectting === false) {
+          that.ws = new WebSocket('wss://s1.ripple.com')
+          that.connectting = true
+        }
+        if (that.connectStatus === true) {
+          clearInterval(tmpInterval)
+        }
+      }, 5000)
     }
     this.ws.onmessage = this.onMsg
-    setInterval(() => {
-      Vue.Ripple.ping(that.ws)
-    }, 10 * 1000)
   }
 }
 </script>
@@ -224,5 +368,10 @@ export default {
   }
   .info {
     margin-top: 10px;
+  }
+  .transactions {
+    height: 400px;
+    overflow-y: scroll;
+    overflow-x: hidden;
   }
 </style>
