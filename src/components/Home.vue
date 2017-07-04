@@ -114,6 +114,8 @@
             <el-col :span="12">
               <el-table
                 :data="bids"
+                height="250"
+                border
                 stripe
                 style="width: 100%">
                 <el-table-column label="买单" align="right">
@@ -138,6 +140,8 @@
             <el-col :span="12">
               <el-table
                 :data="asks"
+                height="250"
+                border
                 stripe
                 style="width: 100%">
                 <el-table-column label="卖单" align="left">
@@ -153,36 +157,6 @@
                     prop="atype"
                     label="类型">
                   </el-table-column>
-                </el-table-column>
-              </el-table>
-            </el-col>
-          </el-row>
-          <h4>Transactions</h4>
-          <el-row>
-            <el-col :span="24">
-              <el-table
-                :data="transactions"
-                style="width: 100%"
-                :row-class-name="transactionsRowClassName">
-                <el-table-column
-                  prop="amount"
-                  label="数量(XRP)"
-                  style="width: 20%">
-                </el-table-column>
-                <el-table-column
-                  prop="price"
-                  label="价格(CNY)"
-                  style="width: 20%">
-                </el-table-column>
-                <el-table-column
-                  prop="atype"
-                  label="类型"
-                  style="width: 20%">
-                </el-table-column>
-                <el-table-column
-                  prop="tx"
-                  label="TX"
-                  style="width: 40%">
                 </el-table-column>
               </el-table>
             </el-col>
@@ -229,10 +203,18 @@ export default {
   },
   computed: {
     totalXRP () {
-      return 0
+      if (this.price > 0) {
+        return this.fixNum(parseFloat(this.myCNY) / parseFloat(this.price) + parseFloat(this.myXRP), 3)
+      } else {
+        return 0
+      }
     },
     totalCNY () {
-      return 0
+      if (this.price > 0) {
+        return this.fixNum(parseFloat(this.myCNY) + parseFloat(this.myXRP) * parseFloat(this.price), 3)
+      } else {
+        return 0
+      }
     }
   },
   methods: {
@@ -252,7 +234,7 @@ export default {
     },
     onMsg (e) {
       let data = JSON.parse(e.data)
-      // console.log('ws:', data)
+      console.log('ws:', data)
       if (data.type === 'response') {
         switch (data.id) {
           case 'ping_pong':
@@ -263,6 +245,18 @@ export default {
             break
           case 'tx_status':
             this.txAdd(data)
+            break
+          case 'update_balance':
+            this.updateBalance(data)
+            break
+          case 'account_line':
+            this.updateGatewayBalance(data)
+            break
+          case 'buy_book':
+            this.buyBooks(data)
+            break
+          case 'sell_book':
+            this.sellBooks(data)
             break
           default:
             break
@@ -313,6 +307,31 @@ export default {
         })
       })
     },
+    buyBooks (data) {
+      let asks = data.result ? data.result.offers : []
+      let that = this
+      this.price = that.fixNum(asks[0].TakerPays.value / (asks[0].TakerGets / drops), 3)
+      that.asks = []
+      asks.forEach((val, index, arr) => {
+        that.asks.push({
+          'amount': that.fixNum(val.TakerGets / drops, 3),
+          'price': that.fixNum(val.TakerPays.value / (val.TakerGets / drops), 3),
+          'atype': 'Sell'
+        })
+      })
+    },
+    sellBooks (data) {
+      let bids = data.result ? data.result.offers : []
+      let that = this
+      that.bids = []
+      bids.forEach((val, index, arr) => {
+        that.bids.push({
+          'amount': that.fixNum(val.TakerPays / drops, 3),
+          'price': that.fixNum(val.TakerGets.value / (val.TakerPays / drops), 3),
+          'atype': 'Buy'
+        })
+      })
+    },
     transaction (data) {
       let detail = data.transaction
       if (data.engine_result === 'tesSUCCESS' && detail.TransactionType === 'OfferCreate') {
@@ -340,6 +359,22 @@ export default {
       if (row.atype === 'Buy') {
         return 'info-buy'
       }
+    },
+    updateBalance (data) {
+      if (data.status === 'success') {
+        this.myXRP = this.fixNum(data.result.account_data.Balance / drops, 5)
+      }
+    },
+    updateGatewayBalance (data) {
+      if (data.status === 'success') {
+        this.myCNY = data.result.lines[0].balance
+      }
+    },
+    intervalFunc () {
+      Vue.Ripple.updateBalance(this, this.myAddress)
+      Vue.Ripple.updateAccountLine(this, this.myAddress)
+      Vue.Ripple.getBooks(this, 'buy')
+      Vue.Ripple.getBooks(this, 'sell')
     }
   },
   mounted () {
@@ -356,22 +391,26 @@ export default {
       this.limitXRP = localMem.limitXRP
     }
     // connect ws
-    this.ws = new WebSocket('wss://s1.ripple.com')
+    this.msgOpen('正在连接服务器...', 'success')
+    this.ws = new WebSocket('wss://s2.ripple.com')
     let that = this
     this.ws.onopen = () => {
       that.connectting = false
       that.connectStatus = true
       that.connectStatusText = '已连接'
       that.interval = setInterval(() => {
-        Vue.Ripple.ping(that.ws)
-      }, 10 * 1000)
-      console.log('websocket is on open!')
-      Vue.Ripple.subscribeBooks(that)
+        // Vue.Ripple.ping(that.ws)
+        if (that.connectStatus === true) {
+          that.intervalFunc()
+        }
+      }, 5 * 1000)
+      that.msgOpen('服务器已连接', 'success')
+      // Vue.Ripple.subscribeBooks(that)
     }
     this.ws.onclose = () => {
       that.connectStatus = false
       that.connectStatusText = '未连接'
-      clearInterval(that.interval)
+      // clearInterval(that.interval)
       console.log('websocket is closed! Reconnecting...')
       // reconnect
       let tmpInterval = setInterval(() => {

@@ -57,7 +57,7 @@ const install = (Vue, options = {}) => {
               'currency': 'CNY',
               'issuer': component.gateway
             },
-            'snapshot': true,
+            'snapshot': false,
             'both': true
           }
         ]
@@ -84,12 +84,62 @@ const install = (Vue, options = {}) => {
       }
       component.ws.send(JSON.stringify(command))
     },
+    getBooks: (component, bookType) => {
+      let command = {}
+      if (bookType === 'buy') {
+        command = {
+          'id': 'buy_book',
+          'command': 'book_offers',
+          'taker': component.myAddress,
+          'taker_gets': {
+            'currency': 'XRP'
+          },
+          'taker_pays': {
+            'currency': 'CNY',
+            'issuer': component.gateway
+          },
+          'limit': 11
+        }
+      } else if (bookType === 'sell') {
+        command = {
+          'id': 'sell_book',
+          'command': 'book_offers',
+          'taker': component.myAddress,
+          'taker_gets': {
+            'currency': 'CNY',
+            'issuer': component.gateway
+          },
+          'taker_pays': {
+            'currency': 'XRP'
+          },
+          'limit': 10
+        }
+      }
+      component.ws.send(JSON.stringify(command))
+    },
     txStatus: (component, transaction) => {
       let command = {
         'id': 'tx_status',
         'command': 'tx',
         'transaction': transaction,
         'binary': false
+      }
+      component.ws.send(JSON.stringify(command))
+    },
+    updateBalance: (component, address) => {
+      let command = {
+        'id': 'update_balance',
+        'command': 'account_info',
+        'account': address
+      }
+      component.ws.send(JSON.stringify(command))
+    },
+    updateAccountLine: (component, address) => {
+      let command = {
+        'id': 'account_line',
+        'command': 'account_lines',
+        'account': address,
+        'ledger': 'current'
       }
       component.ws.send(JSON.stringify(command))
     }
