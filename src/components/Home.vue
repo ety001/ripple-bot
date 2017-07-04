@@ -170,10 +170,13 @@
 <script>
 import Vue from 'vue'
 import Ripple from '@/Lib/Ripple'
+import Robot from '@/Lib/Robot'
 
 Vue.use(Ripple)
+Vue.use(Robot)
 
 const drops = 1000000
+const intervalTime = 5
 
 export default {
   name: 'home',
@@ -371,10 +374,13 @@ export default {
       }
     },
     intervalFunc () {
-      Vue.Ripple.updateBalance(this, this.myAddress)
-      Vue.Ripple.updateAccountLine(this, this.myAddress)
-      Vue.Ripple.getBooks(this, 'buy')
-      Vue.Ripple.getBooks(this, 'sell')
+      if (this.connectStatus === true) {
+        Vue.Ripple.updateBalance(this, this.myAddress)
+        Vue.Ripple.updateAccountLine(this, this.myAddress)
+        Vue.Ripple.getBooks(this, 'buy')
+        Vue.Ripple.getBooks(this, 'sell')
+        Vue.Robot.run(this)
+      }
     }
   },
   mounted () {
@@ -398,12 +404,13 @@ export default {
       that.connectting = false
       that.connectStatus = true
       that.connectStatusText = '已连接'
+      that.intervalFunc()
       that.interval = setInterval(() => {
         // Vue.Ripple.ping(that.ws)
         if (that.connectStatus === true) {
           that.intervalFunc()
         }
-      }, 5 * 1000)
+      }, intervalTime * 1000)
       that.msgOpen('服务器已连接', 'success')
       // Vue.Ripple.subscribeBooks(that)
     }
