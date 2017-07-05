@@ -117,7 +117,8 @@
                 height="250"
                 border
                 stripe
-                style="width: 100%">
+                style="width: 100%"
+                :row-class-name="tableRowClassName">
                 <el-table-column label="买单" align="right">
                   <el-table-column
                     prop="atype"
@@ -142,8 +143,8 @@
                 :data="asks"
                 height="250"
                 border
-                stripe
-                style="width: 100%">
+                style="width: 100%"
+                :row-class-name="tableRowClassName">
                 <el-table-column label="卖单" align="left">
                   <el-table-column
                     prop="price"
@@ -167,7 +168,6 @@
               <el-table
                 :data="orders"
                 border
-                stripe
                 style="width: 100%">
                 <el-table-column
                   prop="seq"
@@ -204,6 +204,7 @@ Vue.use(Robot)
 
 const drops = 1000000
 const intervalTime = 5
+const bookLimit = 30
 
 export default {
   name: 'home',
@@ -360,7 +361,8 @@ export default {
         that.asks.push({
           'amount': that.fixNum(val.TakerGets / drops, 3),
           'price': that.fixNum(val.TakerPays.value / (val.TakerGets / drops), 3),
-          'atype': 'Sell'
+          'atype': 'Sell',
+          'account': val.Account
         })
       })
     },
@@ -373,7 +375,8 @@ export default {
         that.bids.push({
           'amount': that.fixNum(val.TakerPays / drops, 3),
           'price': that.fixNum(val.TakerGets.value / (val.TakerPays / drops), 3),
-          'atype': 'Buy'
+          'atype': 'Buy',
+          'account': val.Account
         })
       })
     },
@@ -422,8 +425,8 @@ export default {
         console.log('run')
         Vue.Ripple.updateBalance(this, this.myAddress)
         Vue.Ripple.updateAccountLine(this, this.myAddress)
-        Vue.Ripple.getBooks(this, 'buy')
-        Vue.Ripple.getBooks(this, 'sell')
+        Vue.Ripple.getBooks(this, 'buy', bookLimit)
+        Vue.Ripple.getBooks(this, 'sell', bookLimit)
         Vue.Ripple.getAccountOffers(this)
         Vue.Robot.run(this, Vue.Ripple)
       }
@@ -460,6 +463,11 @@ export default {
           tmp.seq = val.seq
           that.orders.push(tmp)
         })
+      }
+    },
+    tableRowClassName (row, index) {
+      if (row.account === this.myAddress) {
+        return 'info-buy'
       }
     }
   },

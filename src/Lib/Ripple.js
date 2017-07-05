@@ -84,7 +84,7 @@ const install = (Vue, options = {}) => {
       }
       component.ws.send(JSON.stringify(command))
     },
-    getBooks: (component, bookType) => {
+    getBooks: (component, bookType, bookLimit) => {
       let command = {}
       if (bookType === 'buy') {
         command = {
@@ -98,7 +98,7 @@ const install = (Vue, options = {}) => {
             'currency': 'CNY',
             'issuer': component.gateway
           },
-          'limit': 11
+          'limit': bookLimit + 1
         }
       } else if (bookType === 'sell') {
         command = {
@@ -112,7 +112,7 @@ const install = (Vue, options = {}) => {
           'taker_pays': {
             'currency': 'XRP'
           },
-          'limit': 10
+          'limit': bookLimit
         }
       }
       component.ws.send(JSON.stringify(command))
