@@ -161,6 +161,33 @@
               </el-table>
             </el-col>
           </el-row>
+          <h4>Orders</h4>
+          <el-row :gutter="8">
+            <el-col :span="12">
+              <el-table
+                :data="orders"
+                border
+                stripe
+                style="width: 100%">
+                <el-table-column
+                  prop="seq"
+                  label="Seq">
+                </el-table-column>
+                <el-table-column
+                  prop="order_type"
+                  label="Type">
+                </el-table-column>
+                <el-table-column
+                  prop="amount"
+                  label="数量(XRP)">
+                </el-table-column>
+                <el-table-column
+                  prop="price"
+                  label="价格">
+                </el-table-column>
+              </el-table>
+            </el-col>
+          </el-row>
         </el-col>
       </el-row>
     </el-col>
@@ -201,7 +228,10 @@ export default {
       limitXRP: null,
       asks: [],
       bids: [],
-      transactions: []
+      transactions: [],
+      sequence: 0,
+      ledgerSequence: 0,
+      orders: []
     }
   },
   computed: {
@@ -261,6 +291,18 @@ export default {
           case 'sell_book':
             this.sellBooks(data)
             break
+          case 'order_create_buy':
+            this.orderCreate('buy', data)
+            break
+          case 'order_create_sell':
+            this.orderCreate('sell', data)
+            break
+          case 'order_cancel':
+            this.orderCancel(data)
+            break
+          case 'account_offer':
+            this.accountOffer(data)
+            break
           default:
             break
         }
@@ -313,7 +355,6 @@ export default {
     buyBooks (data) {
       let asks = data.result ? data.result.offers : []
       let that = this
-      this.price = that.fixNum(asks[0].TakerPays.value / (asks[0].TakerGets / drops), 3)
       that.asks = []
       asks.forEach((val, index, arr) => {
         that.asks.push({
@@ -326,6 +367,7 @@ export default {
     sellBooks (data) {
       let bids = data.result ? data.result.offers : []
       let that = this
+      this.price = that.fixNum(bids[0].TakerGets.value / (bids[0].TakerPays / drops), 3)
       that.bids = []
       bids.forEach((val, index, arr) => {
         that.bids.push({
@@ -366,20 +408,58 @@ export default {
     updateBalance (data) {
       if (data.status === 'success') {
         this.myXRP = this.fixNum(data.result.account_data.Balance / drops, 5)
+        this.sequence = parseInt(data.result.account_data.Sequence)
       }
     },
     updateGatewayBalance (data) {
       if (data.status === 'success') {
         this.myCNY = data.result.lines[0].balance
+        this.ledgerSequence = parseInt(data.result.ledger_current_index + 20)
       }
     },
     intervalFunc () {
       if (this.connectStatus === true) {
+        console.log('run')
         Vue.Ripple.updateBalance(this, this.myAddress)
         Vue.Ripple.updateAccountLine(this, this.myAddress)
         Vue.Ripple.getBooks(this, 'buy')
         Vue.Ripple.getBooks(this, 'sell')
-        Vue.Robot.run(this)
+        Vue.Ripple.getAccountOffers(this)
+        Vue.Robot.run(this, Vue.Ripple)
+      }
+    },
+    orderCreate (orderType, data) {
+      console.log('orderCreate')
+      console.log(orderType, data)
+    },
+    orderCancel (data) {
+      console.log('orderCancel')
+      console.log(data)
+    },
+    accountOffer (data) {
+      if (data.result) {
+        let that = this
+        let offers = data.result.offers
+        this.orders = []
+        offers.forEach((val, index) => {
+          let tmp = {
+            seq: 0,
+            amount: 0,
+            order_type: null,
+            price: 0
+          }
+          if (typeof val.taker_gets === 'string' && typeof val.taker_pays === 'object') {
+            tmp.order_type = 'sell'
+            tmp.price = this.fixNum(parseFloat(val.taker_pays.value) / (parseFloat(val.taker_gets) / drops), 3)
+            tmp.amount = this.fixNum(parseFloat(val.taker_gets) / drops, 3)
+          } else if (typeof val.taker_gets === 'object' && typeof val.taker_pays === 'string') {
+            tmp.order_type = 'buy'
+            tmp.price = this.fixNum(parseFloat(val.taker_gets.value) / (parseFloat(val.taker_pays) / drops), 3)
+            tmp.amount = this.fixNum(parseFloat(val.taker_pays) / drops, 3)
+          }
+          tmp.seq = val.seq
+          that.orders.push(tmp)
+        })
       }
     }
   },
@@ -398,7 +478,7 @@ export default {
     }
     // connect ws
     this.msgOpen('正在连接服务器...', 'success')
-    this.ws = new WebSocket('wss://s2.ripple.com')
+    this.ws = new WebSocket('wss://s1.ripple.com')
     let that = this
     this.ws.onopen = () => {
       that.connectting = false

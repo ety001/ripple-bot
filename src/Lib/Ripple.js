@@ -142,6 +142,54 @@ const install = (Vue, options = {}) => {
         'ledger': 'current'
       }
       component.ws.send(JSON.stringify(command))
+    },
+    getAccountOffers: (component, flag = 'account_offer') => {
+      let command = {
+        'id': flag,
+        'command': 'account_offers',
+        'account': component.myAddress,
+        'ledger': 'current'
+      }
+      component.ws.send(JSON.stringify(command))
+    },
+    orderCreate: (component, orderType = 'buy', takerGets, takerPays) => {
+      let command = {
+        'id': 'order_create_' + orderType,
+        'command': 'submit',
+        'tx_json': {
+          'TransactionType': 'OfferCreate',
+          'Account': component.myAddress,
+          'Fee': 12,
+          'Flags': 0,
+          'LastLedgerSequence': component.ledgerSequence++,
+          'Sequence': component.sequence++,
+          'TakerGets': takerGets,
+          'TakerPays': takerPays
+        },
+        'secret': component.primaryKey,
+        'offline': false,
+        'fee_mult_max': 1000
+      }
+      component.ws.send(JSON.stringify(command))
+    },
+    orderCancel: (component, sequence) => {
+      let command = {
+        'id': 'order_cancel',
+        'command': 'submit',
+        'tx_json': {
+          'TransactionType': 'OfferCancel',
+          'Account': component.myAddress,
+          'Fee': '12',
+          'Flags': 0,
+          'LastLedgerSequence': component.ledgerSequence++,
+          'OfferSequence': sequence,
+          'Sequence': component.sequence++
+        },
+        'secret': component.primaryKey,
+        'offline': false,
+        'fee_mult_max': 1000
+      }
+      component.ws.send(JSON.stringify(command))
     }
   }
 }
