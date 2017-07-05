@@ -20,65 +20,66 @@ const install = (Vue, options = {}) => {
         let price = component.price
         // 还没有获取到价格
         if (price <= 0) {
+          console.error('no price')
           return
         }
         // 计算买入卖出价格
         let buyPrice = price * (1 - buyRate / 100)
         let sellPrice = price * (1 + sellRate / 100)
         let orderTotal = component.orderTotal
+        let [buyOfferNum, sellOfferNum] = [0, 0]
+        let offersLength = orders.length
+        orders.forEach((val, index, arr) => {
+          if (val.order_type === 'sell') {
+            // sell xrp order
+            let offerPrice = parseFloat(val.price)
+            // 判断是否超出卖价，超出就取消卖单
+            if (component.fixNum(price * (1 + sellRate / 100), 3) < offerPrice) {
+              // cancel this offer
+              console.log('sellRate', component.fixNum(price * (1 + sellRate / 100), 3), offerPrice)
+              Ripple.orderCancel(component, parseInt(val.seq))
+            } else {
+              sellOfferNum++
+            }
+          } else if (val.order_type === 'buy') {
+            // buy xrp order
+            let offerPrice = parseFloat(val.price)
+            if (component.fixNum(price * (1 - (buyRate + 1) / 100), 3) > offerPrice) {
+              // cancel this offer
+              console.log('buyRate', component.fixNum(price * (1 - (buyRate + 1) / 100), 3), offerPrice)
+              Ripple.orderCancel(component, parseInt(val.seq))
+            } else {
+              buyOfferNum++
+            }
+          }
+          // 遍历完所有order，处理添加订单的事务
+          if (index === offersLength - 1) {
+            if (buyOfferNum === 0) {
+              // 如果当前xrp数量小于阈值，则下买单
+              if (parseFloat(currentXRP) < maxXRP / price) {
+                Vue.Robot.orderCreate(component, Ripple, 'buy', orderTotal / buyPrice, orderTotal)
+              }
+            }
+            if (sellOfferNum === 0) {
+              // 如果当前cny数量小于阈值，则下卖单
+              if (parseFloat(currentCNY) < parseFloat(maxCNY)) {
+                Vue.Robot.orderCreate(component, Ripple, 'sell', orderTotal, orderTotal / sellPrice)
+              }
+            }
+          }
+        })
+        // 如果order为空的时候，添加买卖订单
         if (orders.length === 0) {
           // orders 为空则触发创建买卖订单
-          // console.log('create two order')
+          console.log('create two order', currentXRP, maxXRP / price, currentCNY, maxCNY)
           // 如果当前xrp数量小于阈值，则下买单
-          if (currentXRP < maxXRP) {
+          if (parseFloat(currentXRP) < maxXRP / price) {
             Vue.Robot.orderCreate(component, Ripple, 'buy', orderTotal / buyPrice, orderTotal)
           }
           // 如果当前cny数量小于阈值，则下卖单
-          if (currentCNY < maxCNY) {
+          if (parseFloat(currentCNY) < parseFloat(maxCNY)) {
             Vue.Robot.orderCreate(component, Ripple, 'sell', orderTotal, orderTotal / sellPrice)
           }
-        } else {
-          // orders 不为空需要判断旧订单是否需要取消
-          let [buyOfferNum, sellOfferNum] = [0, 0]
-          let offersLength = orders.length
-          orders.forEach((val, index, arr) => {
-            // console.log(val.seq)
-            if (val.order_type === 'sell') {
-              // sell xrp order
-              let offerPrice = parseFloat(val.price)
-              if (component.fixNum(price * (1 + sellRate / 100), 3) < offerPrice) {
-                // cancel this offer
-                // console.log('sellRate', component.fixNum(price * (1 + sellRate / 100), 3), offerPrice)
-                Ripple.orderCancel(component, parseInt(val.seq))
-              } else {
-                sellOfferNum++
-              }
-            } else if (val.order_type === 'buy') {
-              // buy xrp order
-              let offerPrice = parseFloat(val.price)
-              if (component.fixNum(price * (1 - (buyRate + 1) / 100), 3) > offerPrice) {
-                // cancel this offer
-                // console.log('buyRate', component.fixNum(price * (1 - (buyRate + 1) / 100), 3), offerPrice)
-                Ripple.orderCancel(component, parseInt(val.seq))
-              } else {
-                buyOfferNum++
-              }
-            }
-            if (index === offersLength - 1) {
-              if (buyOfferNum === 0) {
-                // 如果当前xrp数量小于阈值，则下买单
-                if (currentXRP < maxXRP) {
-                  Vue.Robot.orderCreate(component, Ripple, 'buy', orderTotal / buyPrice, orderTotal)
-                }
-              }
-              if (sellOfferNum === 0) {
-                // 如果当前cny数量小于阈值，则下卖单
-                if (currentCNY < maxCNY) {
-                  Vue.Robot.orderCreate(component, Ripple, 'sell', orderTotal, orderTotal / sellPrice)
-                }
-              }
-            }
-          })
         }
       }
     },
@@ -101,6 +102,7 @@ const install = (Vue, options = {}) => {
           'value': buyNum
         }
       }
+      console.log('To create order')
       Ripple.orderCreate(component, orderType, takerGets, takerPays)
     }
   }
