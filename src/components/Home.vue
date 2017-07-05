@@ -416,7 +416,7 @@ export default {
     },
     updateGatewayBalance (data) {
       if (data.status === 'success') {
-        this.myCNY = this.fixNum(data.result.lines[0].balance, 5)
+        this.myCNY = this.fixNum(parseFloat(data.result.lines[0].balance), 5)
         this.ledgerSequence = parseInt(data.result.ledger_current_index + 20)
       }
     },
