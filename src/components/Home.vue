@@ -212,7 +212,6 @@ export default {
     return {
       interval: null,
       ws: null,
-      connectting: false,
       connectStatus: false,
       connectStatusText: '未连接',
       robotStatus: false,
@@ -489,7 +488,6 @@ export default {
     this.ws = new WebSocket('wss://s1.ripple.com')
     let that = this
     this.ws.onopen = () => {
-      that.connectting = false
       that.connectStatus = true
       that.connectStatusText = '已连接'
       that.intervalFunc()
@@ -509,11 +507,10 @@ export default {
       console.log('websocket is closed! Reconnecting...')
       // reconnect
       let tmpInterval = setInterval(() => {
-        if (that.connectStatus === false && that.connectting === false) {
+        console.log('check connect...')
+        if (that.connectStatus === false) {
           that.ws = new WebSocket('wss://s1.ripple.com')
-          that.connectting = true
-        }
-        if (that.connectStatus === true) {
+        } else {
           clearInterval(tmpInterval)
         }
       }, 5000)
