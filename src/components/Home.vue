@@ -116,7 +116,6 @@
                 :data="bids"
                 height="250"
                 border
-                stripe
                 style="width: 100%"
                 :row-class-name="tableRowClassName">
                 <el-table-column label="买单" align="right">
