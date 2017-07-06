@@ -57,6 +57,10 @@
             </el-row>
           </div>
           <div class="info">
+            <span>服务器：</span>
+            <el-input v-model="wssUrl" placeholder="服务器"></el-input>
+          </div>
+          <div class="info">
             <span>地址：</span>
             <el-input v-model="myAddress" placeholder="地址"></el-input>
           </div>
@@ -209,6 +213,7 @@ export default {
   name: 'home',
   data () {
     return {
+      wssUrl: 'wss://s1.ripple.com',
       interval: null,
       ws: null,
       connectStatus: false,
@@ -266,7 +271,7 @@ export default {
     },
     onMsg (e) {
       let data = JSON.parse(e.data)
-      console.log('ws:', data)
+      // console.log('ws:', data)
       if (data.type === 'response') {
         switch (data.id) {
           case 'ping_pong':
@@ -484,7 +489,7 @@ export default {
     }
     // connect ws
     this.msgOpen('正在连接服务器...', 'success')
-    this.ws = new WebSocket('wss://s1.ripple.com')
+    this.ws = new WebSocket(this.wssUrl)
     let that = this
     this.ws.onopen = () => {
       that.connectStatus = true
