@@ -513,7 +513,7 @@ export default {
       let tmpInterval = setInterval(() => {
         console.log('check connect...')
         if (that.connectStatus === false) {
-          that.ws = new WebSocket('wss://s1.ripple.com')
+          that.ws = new WebSocket(that.wssUrl)
         } else {
           clearInterval(tmpInterval)
         }
