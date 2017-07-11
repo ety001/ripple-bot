@@ -196,7 +196,6 @@
     </el-col>
   </el-row>
 </template>
-
 <script>
 import Vue from 'vue'
 import Ripple from '@/Lib/Ripple'
@@ -267,7 +266,7 @@ export default {
         limitXRP: this.limitXRP
       }
       localStorage.mem = JSON.stringify(mem)
-      this.msgOpen('保存成功', 'success')
+      this.msgOpen('保存成功', 'success');
     },
     onMsg (e) {
       let data = JSON.parse(e.data)
@@ -489,7 +488,7 @@ export default {
     }
     // connect ws
     this.msgOpen('正在连接服务器...', 'success')
-    this.ws = new WebSocket(this.wssUrl)
+    this.ws = new ReconnectingWebSocket(this.wssUrl)
     let that = this
     this.ws.onopen = () => {
       that.connectStatus = true
@@ -509,15 +508,6 @@ export default {
       that.connectStatusText = '未连接'
       // clearInterval(that.interval)
       console.log('websocket is closed! Reconnecting...')
-      // reconnect
-      let tmpInterval = setInterval(() => {
-        console.log('check connect...')
-        if (that.connectStatus === false) {
-          that.ws = new WebSocket(that.wssUrl)
-        } else {
-          clearInterval(tmpInterval)
-        }
-      }, 5000)
     }
     this.ws.onmessage = this.onMsg
   }
