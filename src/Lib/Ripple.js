@@ -161,8 +161,8 @@ const install = (Vue, options = {}) => {
           'Account': component.myAddress,
           'Fee': 12,
           'Flags': 0,
-          'LastLedgerSequence': component.ledgerSequence++,
-          'Sequence': component.sequence++,
+          'LastLedgerSequence': component.ledgerSequence,
+          'Sequence': component.sequence,
           'TakerGets': takerGets,
           'TakerPays': takerPays
         },
@@ -170,6 +170,8 @@ const install = (Vue, options = {}) => {
         'offline': false,
         'fee_mult_max': 1000
       }
+      component.ledgerSequence += 100
+      component.sequence += 100
       component.ws.send(JSON.stringify(command))
     },
     orderCancel: (component, sequence) => {
@@ -181,14 +183,16 @@ const install = (Vue, options = {}) => {
           'Account': component.myAddress,
           'Fee': '12',
           'Flags': 0,
-          'LastLedgerSequence': component.ledgerSequence++,
+          'LastLedgerSequence': component.ledgerSequence,
           'OfferSequence': sequence,
-          'Sequence': component.sequence++
+          'Sequence': component.sequence
         },
         'secret': component.primaryKey,
         'offline': false,
         'fee_mult_max': 1000
       }
+      component.ledgerSequence += 100
+      component.sequence += 100
       component.ws.send(JSON.stringify(command))
     }
   }
