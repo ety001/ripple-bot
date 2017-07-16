@@ -56,7 +56,7 @@ const install = (Vue, options = {}) => {
           if (index === offersLength - 1) {
             if (buyOfferNum === 0) {
               // 如果当前xrp数量小于阈值，则下买单
-              if (parseFloat(currentXRP) < maxXRP / price) {
+              if (parseFloat(currentXRP) < parseFloat(maxXRP) / parseFloat(price) ) {
                 Vue.Robot.orderCreate(component, Ripple, 'buy', orderTotal / buyPrice, orderTotal)
               }
             }
