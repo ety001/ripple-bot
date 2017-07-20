@@ -196,22 +196,18 @@
     </el-col>
   </el-row>
 </template>
+
 <script>
 import Vue from 'vue'
-import Ripple from '@/Lib/Ripple'
-import Robot from '@/Lib/Robot'
-
-Vue.use(Ripple)
-Vue.use(Robot)
-
-const drops = 1000000
 const intervalTime = 5
-const bookLimit = 30
-
+const bookLimit = 20
+const ledgerOffset = 100
+const myInstructions = {maxLedgerVersionOffset: ledgerOffset}
 export default {
   name: 'home',
   data () {
     return {
+      api: null,
       wssUrl: 'wss://s1.ripple.com',
       interval: null,
       ws: null,
@@ -234,7 +230,9 @@ export default {
       transactions: [],
       sequence: 0,
       ledgerSequence: 0,
-      orders: []
+      orders: [],
+      buyOrderNum: 0,
+      sellOrderNum: 0
     }
   },
   computed: {
@@ -266,52 +264,7 @@ export default {
         limitXRP: this.limitXRP
       }
       localStorage.mem = JSON.stringify(mem)
-      this.msgOpen('保存成功', 'success');
-    },
-    onMsg (e) {
-      let data = JSON.parse(e.data)
-      // console.log('ws:', data)
-      if (data.type === 'response') {
-        switch (data.id) {
-          case 'ping_pong':
-            Vue.Ripple.pong(this, data)
-            break
-          case 'xrp_cny_order_book':
-            this.orderbook(data)
-            break
-          case 'tx_status':
-            this.txAdd(data)
-            break
-          case 'update_balance':
-            this.updateBalance(data)
-            break
-          case 'account_line':
-            this.updateGatewayBalance(data)
-            break
-          case 'buy_book':
-            this.buyBooks(data)
-            break
-          case 'sell_book':
-            this.sellBooks(data)
-            break
-          case 'order_create_buy':
-            this.orderCreate('buy', data)
-            break
-          case 'order_create_sell':
-            this.orderCreate('sell', data)
-            break
-          case 'order_cancel':
-            this.orderCancel(data)
-            break
-          case 'account_offer':
-            this.accountOffer(data)
-            break
-          default:
-            break
-        }
-      } else if (data.type === 'transaction') {
-        this.transaction(data)
-      }
+      this.msgOpen('保存成功', 'success')
     },
     msgOpen (msg, msgType = 'success') {
       switch (msgType) {
@@ -334,137 +287,244 @@ export default {
       }
     },
     fixNum (val, limit = 3) {
+      val = parseFloat(val)
       return val.toFixed(limit)
     },
     orderbook (data) {
-      let asks = data.result ? data.result.asks.slice(0, 15) : []
-      let bids = data.result ? data.result.bids.slice(0, 15) : []
-      let that = this
-      asks.forEach((val, index, arr) => {
-        that.asks.push({
-          'amount': that.fixNum(val.TakerGets / drops, 3),
-          'price': that.fixNum(val.TakerPays.value / (val.TakerGets / drops), 3),
-          'atype': 'Sell'
-        })
-      })
-      bids.forEach((val, index, arr) => {
-        that.bids.push({
-          'amount': that.fixNum(val.TakerPays / drops, 3),
-          'price': that.fixNum(val.TakerGets.value / (val.TakerPays / drops), 3),
-          'atype': 'Buy'
-        })
-      })
-    },
-    buyBooks (data) {
-      let asks = data.result ? data.result.offers : []
-      let that = this
-      that.asks = []
-      asks.forEach((val, index, arr) => {
-        that.asks.push({
-          'amount': that.fixNum(val.TakerGets / drops, 3),
-          'price': that.fixNum(val.TakerPays.value / (val.TakerGets / drops), 3),
-          'atype': 'Sell',
-          'account': val.Account
-        })
-      })
-    },
-    sellBooks (data) {
-      let bids = data.result ? data.result.offers : []
-      let that = this
-      this.price = that.fixNum(bids[0].TakerGets.value / (bids[0].TakerPays / drops), 3)
-      that.bids = []
-      bids.forEach((val, index, arr) => {
-        that.bids.push({
-          'amount': that.fixNum(val.TakerPays / drops, 3),
-          'price': that.fixNum(val.TakerGets.value / (val.TakerPays / drops), 3),
-          'atype': 'Buy',
-          'account': val.Account
-        })
-      })
-    },
-    transaction (data) {
-      let detail = data.transaction
-      if (data.engine_result === 'tesSUCCESS' && detail.TransactionType === 'OfferCreate') {
-        Vue.Ripple.txStatus(this, detail.hash)
-      }
-    },
-    txAdd (data) {
-      if (data.result.validated === true) {
-        let result = data.result
-        if (typeof result.TakerPays === 'object' && typeof result.TakerGets === 'object') {
-          return
+      const orderbook = {
+        'base': {
+          'currency': 'XRP'
+        },
+        "counter": {
+          'currency': 'CNY',
+          'counterparty': this.gateway
         }
-        this.transactions.unshift({
-          'amount': this.fixNum(typeof result.TakerPays === 'string' ? result.TakerPays / drops : result.TakerGets / drops, 3),
-          'price': this.fixNum(typeof result.TakerPays === 'string' ? result.TakerGets.value / (result.TakerPays / drops) : result.TakerPays.value / (result.TakerGets / drops), 3),
-          'atype': typeof result.TakerPays === 'string' ? 'Sell' : 'Buy',
-          'tx': result.hash
+      }
+      const options = {
+        limit: 30
+      }
+      this.api.getOrderbook(this.myAddress, orderbook, options).then((orderbook)=>{
+        // console.log(orderbook)
+        let asks = orderbook.asks ? orderbook.asks.slice(0, bookLimit) : []
+        let bids = orderbook.bids ? orderbook.bids.slice(0, bookLimit) : []
+        this.asks = []
+        this.bids = []
+        asks.forEach((val, index, arr) => {
+          this.asks.push({
+            'amount': this.fixNum(val.specification.quantity.value, 5),
+            'price': this.fixNum(val.properties.makerExchangeRate, 5),
+            'atype': 'Sell',
+            'account': val.properties.maker
+          })
         })
+        bids.forEach((val, index, arr) => {
+          if (index === 0) {
+            this.price = this.fixNum(1/val.properties.makerExchangeRate, 5)
+          }
+          this.bids.push({
+            'amount': this.fixNum(val.specification.quantity.value, 5),
+            'price': this.fixNum(1/val.properties.makerExchangeRate, 5),
+            'atype': 'Buy',
+            'account': val.properties.maker
+          })
+        })
+      })
+    },
+    updateBalance () {
+      this.api.getBalances(this.myAddress).then(balances =>{
+        balances.forEach((val, index) => {
+          if (val.currency === 'XRP') {
+            this.myXRP = this.fixNum(val.value, 5)
+          }
+          if (val.currency === 'CNY') {
+            this.myCNY = this.fixNum(val.value, 5)
+          }
+        })
+      })
+    },
+    accountOffers () {
+      this.api.getOrders(this.myAddress).then(offers => {
+        // console.log(offers)
+        this.orders = []
+        if (offers.length > 0) {
+          offers.forEach((val, index) => {
+            this.orders.push({
+              seq: val.properties.sequence,
+              amount: this.fixNum(val.specification.quantity.value, 5),
+              order_type: val.specification.direction,
+              price: this.fixNum(val.specification.direction === 'buy' ? 1 / val.properties.makerExchangeRate : val.properties.makerExchangeRate, 5)
+            })
+            if (val.specification.direction === 'buy') {
+              this.buyOrderNum ++
+            } else {
+              this.sellOrderNum ++
+            }
+          })
+        }
+      })
+    },
+    robot () {
+      if (this.robotStatus === true) {
+        // 计算买入卖出价格
+        let buyPrice = this.price * (1 - this.buyRate / 100)
+        let sellPrice = this.price * (1 + this.sellRate / 100)
+        // 初始化数据
+        let offersLength = this.orders.length
+        let maxBuyOrderSeq = 0
+        let maxSellOrderSeq = 0
+        let tmpBuyOrders = []
+        let tmpSellOrders = []
+        // console.log(this.buyOrderNum === 0 && this.sellOrderNum === 0)
+        if (this.buyOrderNum === 0 && this.sellOrderNum === 0) {
+          this.buyOrder()
+        } else {
+          // 开始处理(先取消订单，再下订单)
+          this.orders.forEach((val, index) => {
+            if (val.order_type === 'buy') {
+              // 取消超出范围的订单
+              if (this.fixNum(val.price, 2) < this.fixNum(buyPrice, 2)) {
+                this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
+                  let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+                  return this.api.submit(tmp.signedTransaction)
+                }).then(res => {
+                  console.log('Cancel Seq ' + val.seq + ', Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
+                })
+              } else {
+                // 获取最晚的一个seq
+                if (val.seq > maxBuyOrderSeq) {
+                  maxBuyOrderSeq = val.seq
+                }
+                // 未处理订单放到临时数组
+                tmpBuyOrders.push(val)
+              }
+            } else {
+              // 取消超出范围的订单
+              if (this.fixNum(val.price, 2) > this.fixNum(sellPrice, 2)) {
+                this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
+                  let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+                  return this.api.submit(tmp.signedTransaction)
+                }).then(res => {
+                  console.log('Cancel Seq ' + val.seq + ', Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
+                })
+              } else {
+                // 获取最晚的一个seq
+                if (val.seq > maxSellOrderSeq) {
+                  maxSellOrderSeq = val.seq
+                }
+                // 未处理订单放到临时数组
+                tmpSellOrders.push(val)
+              }
+            }
+            // 如果已经是最后一次循环
+            if (index === offersLength - 1) {
+              // console.log('Get in last foreach:', tmpBuyOrders, tmpSellOrders, maxBuyOrderSeq, maxSellOrderSeq)
+              if (tmpBuyOrders.length > 1) {
+                // 处理多于一个的订单
+                tmpBuyOrders.forEach((subVal, subIndex) => {
+                  if (subVal.seq !== maxBuyOrderSeq) {
+                    this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
+                      let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+                      return this.api.submit(tmp.signedTransaction)
+                    }).then(res => {
+                      console.log('Cancel Seq ' + val.seq + ', Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
+                    })
+                  }
+                })
+              } else if (tmpBuyOrders.length === 0) {
+                // 下买单
+                this.buyOrder()
+              }
+              if (tmpSellOrders.length > 1) {
+                // 处理多于一个的订单
+                tmpSellOrders.forEach((subVal, subIndex) => {
+                  if (subVal.seq !== maxSellOrderSeq) {
+                    this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
+                      let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+                      return this.api.submit(tmp.signedTransaction)
+                    }).then(res => {
+                      console.log('Cancel Seq ' + val.seq + ', Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
+                    })
+                  }
+                })
+              } else if (tmpSellOrders.length === 0) {
+                // 下卖单
+                this.sellOrder()
+              }
+            }
+          })
+        }
       }
     },
-    transactionsRowClassName (row, index) {
-      if (row.atype === 'Sell') {
-        return 'info-sell'
+    buyOrder () {
+      if (parseFloat(this.myXRP) >= parseFloat(this.limitXRP / this.price)) {
+        return
       }
-      if (row.atype === 'Buy') {
-        return 'info-buy'
+      // 计算买入价格
+      let buyPrice = this.price * (1 - this.buyRate / 100)
+      console.log('Start creating buy order...')
+      let xrpVal = this.fixNum(parseFloat(this.orderTotal) / (parseFloat(buyPrice)), 5).toString()
+      const order = {
+        'direction': 'buy',
+        'quantity': {
+          'currency': 'XRP',
+          'value': xrpVal
+        },
+        'totalPrice': {
+          'currency': 'CNY',
+          'counterparty': this.gateway,
+          'value': this.orderTotal
+        }
       }
+      // console.log(order)
+      this.api.prepareOrder(this.myAddress, order, myInstructions).then(prepared => {
+        // console.log('buy:', prepared)
+        let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+        // console.log('buy:', tmp)
+        return this.api.submit(tmp.signedTransaction)
+      }).then(res => {
+        if (this.sellOrderNum === 0) {
+          this.sellOrder()
+        }
+        console.log('Create Buy Order, Buy ' + xrpVal + ' XRP, Price: ' + buyPrice, res)
+      })
     },
-    updateBalance (data) {
-      if (data.status === 'success') {
-        this.myXRP = this.fixNum(data.result.account_data.Balance / drops, 5)
-        this.sequence = parseInt(data.result.account_data.Sequence)
+    sellOrder () {
+      if (parseFloat(this.myCNY) >= parseFloat(this.limitCNY)) {
+        return
       }
-    },
-    updateGatewayBalance (data) {
-      if (data.status === 'success') {
-        this.myCNY = this.fixNum(parseFloat(data.result.lines[0].balance), 5)
-        this.ledgerSequence = parseInt(data.result.ledger_current_index + 100)
+      // 计算卖出价格
+      let sellPrice = this.price * (1 + this.sellRate / 100)
+      console.log('Start creating sell order...')
+      let xrpVal = this.fixNum(parseFloat(this.orderTotal) / (parseFloat(sellPrice)), 5).toString()
+      const order = {
+        'direction': 'sell',
+        'quantity': {
+          'currency': 'XRP',
+          'value': xrpVal
+        },
+        'totalPrice': {
+          'currency': 'CNY',
+          'counterparty': this.gateway,
+          'value': this.orderTotal
+        }
       }
+      // console.log(order)
+      this.api.prepareOrder(this.myAddress, order, myInstructions).then(prepared => {
+        // console.log('sell:', prepared)
+        let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+        // console.log('sell:', tmp)
+        return this.api.submit(tmp.signedTransaction)
+      }).then(res => {
+        console.log('Create Sell Order, Sell ' + xrpVal + ' XRP, Price: ' + sellPrice, res)
+      })
     },
     intervalFunc () {
       if (this.connectStatus === true) {
         console.log('run')
-        Vue.Ripple.updateBalance(this, this.myAddress)
-        Vue.Ripple.updateAccountLine(this, this.myAddress)
-        Vue.Ripple.getBooks(this, 'buy', bookLimit)
-        Vue.Ripple.getBooks(this, 'sell', bookLimit)
-        Vue.Ripple.getAccountOffers(this)
-        Vue.Robot.run(this, Vue.Ripple)
-      }
-    },
-    orderCreate (orderType, data) {
-      console.log('orderCreate')
-      console.log(orderType, data)
-    },
-    orderCancel (data) {
-      console.log('orderCancel')
-      console.log(data)
-    },
-    accountOffer (data) {
-      if (data.result) {
-        let that = this
-        let offers = data.result.offers
-        this.orders = []
-        offers.forEach((val, index) => {
-          let tmp = {
-            seq: 0,
-            amount: 0,
-            order_type: null,
-            price: 0
-          }
-          if (typeof val.taker_gets === 'string' && typeof val.taker_pays === 'object') {
-            tmp.order_type = 'sell'
-            tmp.price = this.fixNum(parseFloat(val.taker_pays.value) / (parseFloat(val.taker_gets) / drops), 3)
-            tmp.amount = this.fixNum(parseFloat(val.taker_gets) / drops, 3)
-          } else if (typeof val.taker_gets === 'object' && typeof val.taker_pays === 'string') {
-            tmp.order_type = 'buy'
-            tmp.price = this.fixNum(parseFloat(val.taker_gets.value) / (parseFloat(val.taker_pays) / drops), 3)
-            tmp.amount = this.fixNum(parseFloat(val.taker_pays) / drops, 3)
-          }
-          tmp.seq = val.seq
-          that.orders.push(tmp)
-        })
+        this.updateBalance()
+        this.orderbook()
+        this.accountOffers()
+        this.robot()
       }
     },
     tableRowClassName (row, index) {
@@ -487,29 +547,27 @@ export default {
       this.limitXRP = localMem.limitXRP
     }
     // connect ws
+    this.api = new window.ripple.RippleAPI({
+      server: this.wssUrl // Public rippled server
+    })
     this.msgOpen('正在连接服务器...', 'success')
-    this.ws = new ReconnectingWebSocket(this.wssUrl)
-    let that = this
-    this.ws.onopen = () => {
-      that.connectStatus = true
-      that.connectStatusText = '已连接'
-      that.intervalFunc()
-      that.interval = setInterval(() => {
-        // Vue.Ripple.ping(that.ws)
-        if (that.connectStatus === true) {
-          that.intervalFunc()
-        }
+    
+    this.api.on('connected', () => {
+      this.connectStatus = true
+      this.connectStatusText = '已连接'
+      this.intervalFunc()
+      this.interval = setInterval(() => {
+        this.intervalFunc()
       }, intervalTime * 1000)
-      that.msgOpen('服务器已连接', 'success')
-      // Vue.Ripple.subscribeBooks(that)
-    }
-    this.ws.onclose = () => {
-      that.connectStatus = false
-      that.connectStatusText = '未连接'
-      // clearInterval(that.interval)
-      console.log('websocket is closed! Reconnecting...')
-    }
-    this.ws.onmessage = this.onMsg
+      this.msgOpen('服务器已连接', 'success')
+    })
+    this.api.on('disconnected', (code) => {
+      this.connectStatus = false
+      this.connectStatusText = '未连接'
+      this.api.connect()
+      this.msgOpen('服务器断开连接', 'warning')
+    })
+    this.api.connect()
   }
 }
 </script>
