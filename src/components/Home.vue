@@ -419,7 +419,9 @@ export default {
             }
             // 如果已经是最后一次循环
             if (index === offersLength - 1) {
-              console.log('Get in last foreach:', tmpBuyOrders, tmpSellOrders, maxBuyOrderSeq, maxSellOrderSeq)
+              if (tmpBuyOrders.length !== 1 && tmpSellOrders.length !== 1) {
+                console.log('Get in last foreach:', tmpBuyOrders, tmpSellOrders, maxBuyOrderSeq, maxSellOrderSeq)
+              }
               if (tmpBuyOrders.length > 1) {
                 // 处理多于一个的订单
                 tmpBuyOrders.forEach((subVal, subIndex) => {
