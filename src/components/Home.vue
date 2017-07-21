@@ -389,7 +389,7 @@ export default {
                   let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                   return this.api.submit(tmp.signedTransaction)
                 }).then(res => {
-                  console.log('Cancel Seq ' + val.seq + ', Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
+                  console.log('Cancel Seq ' + val.seq + ',Reason: price change(' + this.fixNum(val.price, 2) + ',' + this.fixNum(buyPrice, 2) + '), Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
                 })
               } else {
                 // 获取最晚的一个seq
@@ -406,7 +406,7 @@ export default {
                   let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                   return this.api.submit(tmp.signedTransaction)
                 }).then(res => {
-                  console.log('Cancel Seq ' + val.seq + ', Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
+                  console.log('Cancel Seq ' + val.seq + ',Reason: price change(' + this.fixNum(val.price, 2) + ',' + this.fixNum(sellPrice, 2) + ') Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
                 })
               } else {
                 // 获取最晚的一个seq
@@ -419,16 +419,16 @@ export default {
             }
             // 如果已经是最后一次循环
             if (index === offersLength - 1) {
-              // console.log('Get in last foreach:', tmpBuyOrders, tmpSellOrders, maxBuyOrderSeq, maxSellOrderSeq)
+              console.log('Get in last foreach:', tmpBuyOrders, tmpSellOrders, maxBuyOrderSeq, maxSellOrderSeq)
               if (tmpBuyOrders.length > 1) {
                 // 处理多于一个的订单
                 tmpBuyOrders.forEach((subVal, subIndex) => {
-                  if (subVal.seq !== maxBuyOrderSeq) {
-                    this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
+                  if (parseInt(subVal.seq) !== parseInt(maxBuyOrderSeq)) {
+                    this.api.prepareOrderCancellation(this.myAddress, {orderSequence: subVal.seq}, myInstructions).then(prepared => {
                       let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                       return this.api.submit(tmp.signedTransaction)
                     }).then(res => {
-                      console.log('Cancel Seq ' + val.seq + ', Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
+                      console.log('Cancel Seq ' + subVal.seq + ',Reason: order num > 1, Order Amount: ' + subVal.amount + ', Price: ' + subVal.price + ', Order Type:' + subVal.order_type, res)
                     })
                   }
                 })
@@ -440,11 +440,11 @@ export default {
                 // 处理多于一个的订单
                 tmpSellOrders.forEach((subVal, subIndex) => {
                   if (subVal.seq !== maxSellOrderSeq) {
-                    this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
+                    this.api.prepareOrderCancellation(this.myAddress, {orderSequence: subVal.seq}, myInstructions).then(prepared => {
                       let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                       return this.api.submit(tmp.signedTransaction)
                     }).then(res => {
-                      console.log('Cancel Seq ' + val.seq + ', Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res)
+                      console.log('Cancel Seq ' + subVal.seq + ',Reason: order num > 1, Order Amount: ' + subVal.amount + ', Price: ' + subVal.price + ', Order Type:' + subVal.order_type, res)
                     })
                   }
                 })
@@ -477,16 +477,24 @@ export default {
           'value': this.orderTotal
         }
       }
+      let seq = null
       // console.log(order)
       this.api.prepareOrder(this.myAddress, order, myInstructions).then(prepared => {
         // console.log('buy:', prepared)
         let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+        seq = prepared.instructions.sequence
         // console.log('buy:', tmp)
         return this.api.submit(tmp.signedTransaction)
       }).then(res => {
         if (this.sellOrderNum === 0) {
           this.sellOrder()
         }
+        this.orders.push({
+          seq: seq,
+          amount: xrpVal,
+          order_type: 'buy',
+          price: this.fixNum(buyPrice, 5)
+        })
         console.log('Create Buy Order, Buy ' + xrpVal + ' XRP, Price: ' + buyPrice, res)
       })
     },
@@ -510,13 +518,21 @@ export default {
           'value': this.orderTotal
         }
       }
+      let seq = null
       // console.log(order)
       this.api.prepareOrder(this.myAddress, order, myInstructions).then(prepared => {
         // console.log('sell:', prepared)
         let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
         // console.log('sell:', tmp)
+        seq = prepared.instructions.sequence
         return this.api.submit(tmp.signedTransaction)
       }).then(res => {
+        this.orders.push({
+          seq: seq,
+          amount: xrpVal,
+          order_type: 'sell',
+          price: this.fixNum(sellPrice, 5)
+        })
         console.log('Create Sell Order, Sell ' + xrpVal + ' XRP, Price: ' + sellPrice, res)
       })
     },
