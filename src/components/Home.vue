@@ -346,6 +346,8 @@ export default {
       this.api.getOrders(this.myAddress).then(offers => {
         // console.log(offers)
         this.orders = []
+        this.buyOrderNum = 0
+        this.sellOrderNum = 0
         if (offers.length > 0) {
           offers.forEach((val, index) => {
             this.orders.push({
