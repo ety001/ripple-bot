@@ -553,7 +553,6 @@ export default {
       })
     },
     sellOrder () {
-      this.console('Start creating sell order...', 'msg')
       // 计算卖出价格
       let sellPrice = this.sellPrice * (1 + this.sellRate / 100)
       let xrpVal = this.fixNum(parseFloat(this.orderTotal) / (parseFloat(sellPrice)), 5).toString()
@@ -565,6 +564,7 @@ export default {
       if (parseFloat(xrpVal) > parseFloat(this.myXRP)) {
         return
       }
+      this.console('Start creating sell order...', 'msg')
       const order = {
         'direction': 'sell',
         'quantity': {
