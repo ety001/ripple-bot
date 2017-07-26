@@ -201,7 +201,7 @@
 
 <script>
 import Vue from 'vue'
-const version = 'v0.0.4'
+const version = 'v0.0.5'
 const intervalTime = 5
 const checkOrderIntervalTime = 1
 const bookLimit = 20
