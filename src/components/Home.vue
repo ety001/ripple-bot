@@ -609,11 +609,14 @@ export default {
         }).then((offersRes) => {
           this.console('update offers')
           return this.robot()
-        }).then(() => {
+        }).catch(err => {
+          console.error(err)
+        })
+        return new Promise((resolve, reject) => {
           setTimeout(() => {
             this.intervalFunc()
           }, intervalTime * 1000)
-        }).catch(err => {
+        }).then().catch((err) => {
           console.error(err)
         })
       }
