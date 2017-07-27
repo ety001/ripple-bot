@@ -201,7 +201,7 @@
 
 <script>
 import Vue from 'vue'
-const version = 'v0.0.5'
+const version = 'v0.0.6'
 const intervalTime = 5
 const checkOrderIntervalTime = 1
 const bookLimit = 20
@@ -412,7 +412,7 @@ export default {
         let maxSellOrderSeq = 0
         let tmpBuyOrders = []
         let tmpSellOrders = []
-        this.console(this.buyOrderNum === 0 && this.sellOrderNum === 0)
+        this.console([this.buyOrderNum === 0 && this.sellOrderNum === 0, 'robot1'])
         if (this.buyOrderNum === 0 && this.sellOrderNum === 0) {
           return this.buyOrder(true)
         } else {
@@ -501,12 +501,17 @@ export default {
       }
     },
     buyOrder (tag=false) {
+      if (tag === true) {
+        this.sellOrder()
+      }
       // 如果拥有的xrp大于限定值，则不买进
       if (parseFloat(this.myXRP) >= parseFloat(this.limitXRP / this.sellPrice)) {
+        this.console(['myXRP > limitXRP / sellPrice', parseFloat(this.myXRP), parseFloat(this.limitXRP / this.sellPrice)])
         return
       }
       // 如果买入量大于当前拥有值，则不买进
       if (parseFloat(this.orderTotal) > parseFloat(this.myCNY)) {
+        this.console(['orderTotal > myCNY', parseFloat(this.orderTotal), parseFloat(this.myCNY)])
         return
       }
       // 计算买入价格
@@ -545,9 +550,6 @@ export default {
           this.console(['Create Buy Order, Buy ' + xrpVal + ' XRP, Price: ' + buyPrice, res], 'msg')
           return true
         }).then(() => {
-          if (tag === true) {
-            this.sellOrder()
-          }
           return true
         })
       })
@@ -558,10 +560,12 @@ export default {
       let xrpVal = this.fixNum(parseFloat(this.orderTotal) / (parseFloat(sellPrice)), 5).toString()
       // 如果拥有的cny大于限定值，则不卖出
       if (parseFloat(this.myCNY) >= parseFloat(this.limitCNY)) {
+        this.console(['myCNY > limitCNY', parseFloat(this.myCNY), parseFloat(this.limitCNY)])
         return
       }
       // 如果订单价值大于当前拥有的xrp，则停止操作
       if (parseFloat(xrpVal) > parseFloat(this.myXRP)) {
+        this.console(['xrpVal > myXRP', parseFloat(xrpVal), parseFloat(this.myXRP)])
         return
       }
       this.console('Start creating sell order...', 'msg')
