@@ -196,6 +196,9 @@
         </el-col>
       </el-row>
     </el-col>
+    <el-col id="donor" :span="20" :offset="2">
+      捐助作者XRP： <b>{{ donor }}</b>
+    </el-col>
   </el-row>
 </template>
 
@@ -237,7 +240,8 @@ export default {
       ledgerSequence: 0,
       orders: [],
       buyOrderNum: 0,
-      sellOrderNum: 0
+      sellOrderNum: 0,
+      donor: 'r4ff6mjZ1Huznci4ZQXZZ6V7ZU7yt9S6ha'
     }
   },
   computed: {
@@ -691,5 +695,11 @@ export default {
   }
   .el-table .info-sell {
     background-color: #f2dede;
+  }
+  #donor {
+    background-color: #eef1f6;
+    text-align: center;
+    padding: 10px 0;
+    margin-top: 10px;
   }
 </style>
