@@ -60,19 +60,19 @@
           </div>
           <div class="info">
             <span>服务器：</span>
-            <el-input v-model="wssUrl" placeholder="服务器"></el-input>
+            <el-input v-model.trim="wssUrl" placeholder="服务器"></el-input>
           </div>
           <div class="info">
             <span>地址：</span>
-            <el-input v-model="myAddress" placeholder="地址"></el-input>
+            <el-input v-model.trim="myAddress" placeholder="地址"></el-input>
           </div>
           <div class="info">
             <span>私钥：</span>
-            <el-input type="password" v-model="primaryKey" placeholder="私钥"></el-input>
+            <el-input type="password" v-model.trim="primaryKey" placeholder="私钥"></el-input>
           </div>
           <div class="info">
             <span>网关：</span>
-            <el-input v-model="gateway" placeholder="网关"></el-input>
+            <el-input v-model.trim="gateway" placeholder="网关"></el-input>
           </div>
           
           <div class="info">
@@ -81,31 +81,31 @@
                 <el-tooltip class="item" effect="dark" content="买入价 = buyPrice * ( 1 - 买入比/100 )" placement="right">
                   <el-button>买入比(%)：</el-button>
                 </el-tooltip>
-                <el-input v-model="buyRate" placeholder="买入比(%),例如: 2"></el-input>
+                <el-input v-model.trim="buyRate" placeholder="买入比(%),例如: 2"></el-input>
               </el-col>
               <el-col :span="8">
                 <el-tooltip class="item" effect="dark" content="卖出价 = sellPrice * ( 1 + 卖出比/100 )" placement="right">
                   <el-button>卖出比(%)：</el-button>
                 </el-tooltip>
-                <el-input v-model="sellRate" placeholder="卖出比(%),例如: 2"></el-input>
+                <el-input v-model.trim="sellRate" placeholder="卖出比(%),例如: 2"></el-input>
               </el-col>
               <el-col :span="8">
                 <el-tooltip class="item" effect="dark" content="单个订单的价值，无论买入卖出都按照CNY结算。例如买单时，订单价值 = 买入价 * 买入量" placement="right">
                   <el-button>订单价值(CNY)：</el-button>
                 </el-tooltip>
-                <el-input v-model="orderTotal" placeholder="订单价值(CNY),例如: 10"></el-input>
+                <el-input v-model.trim="orderTotal" placeholder="订单价值(CNY),例如: 10"></el-input>
               </el-col>
               <el-col :span="8">
                 <el-tooltip class="item" effect="dark" content="CNY达到该上限值，则停止卖出XRP" placement="right">
                   <el-button>CNY上限：</el-button>
                 </el-tooltip>
-                <el-input v-model="limitCNY" placeholder="CNY上限"></el-input>
+                <el-input v-model.trim="limitCNY" placeholder="CNY上限"></el-input>
               </el-col>
               <el-col :span="8">
                 <el-tooltip class="item" effect="dark" content="XRP达到该上限值，则停止买入XRP（按照CNY计算，即实际的XRP上限值为 你设置的XRP上限值/sellPrice ）" placement="right">
                   <el-button>XRP上限(CNY)：</el-button>
                 </el-tooltip>
-                <el-input v-model="limitXRP" placeholder="XRP上限"></el-input>
+                <el-input v-model.trim="limitXRP" placeholder="XRP上限"></el-input>
               </el-col>
               <el-col :span="8">
                 <br><br>
@@ -115,7 +115,7 @@
           </div>
         </el-col>
         <el-col :span="16">
-          <h4>Offsers List</h4>
+          <h4>Orderbook</h4>
           <el-row :gutter="8">
             <el-col :span="12">
               <el-table
@@ -167,7 +167,7 @@
               </el-table>
             </el-col>
           </el-row>
-          <h4>Orders</h4>
+          <h4>My Orders</h4>
           <el-row :gutter="8">
             <el-col :span="12">
               <el-table
