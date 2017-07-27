@@ -78,13 +78,13 @@
           <div class="info">
             <el-row :gutter="8">
               <el-col :span="8">
-                <el-tooltip class="item" effect="dark" content="买入价 = 当前价 * ( 1 - 买入比/100 )" placement="right">
+                <el-tooltip class="item" effect="dark" content="买入价 = buyPrice * ( 1 - 买入比/100 )" placement="right">
                   <el-button>买入比(%)：</el-button>
                 </el-tooltip>
                 <el-input v-model="buyRate" placeholder="买入比(%),例如: 2"></el-input>
               </el-col>
               <el-col :span="8">
-                <el-tooltip class="item" effect="dark" content="卖出价 = 当前价 * ( 1 + 卖出比/100 )" placement="right">
+                <el-tooltip class="item" effect="dark" content="卖出价 = sellPrice * ( 1 + 卖出比/100 )" placement="right">
                   <el-button>卖出比(%)：</el-button>
                 </el-tooltip>
                 <el-input v-model="sellRate" placeholder="卖出比(%),例如: 2"></el-input>
@@ -96,13 +96,13 @@
                 <el-input v-model="orderTotal" placeholder="订单价值(CNY),例如: 10"></el-input>
               </el-col>
               <el-col :span="8">
-                <el-tooltip class="item" effect="dark" content="达到该上限值，则停止卖出XRP" placement="right">
+                <el-tooltip class="item" effect="dark" content="CNY达到该上限值，则停止卖出XRP" placement="right">
                   <el-button>CNY上限：</el-button>
                 </el-tooltip>
                 <el-input v-model="limitCNY" placeholder="CNY上限"></el-input>
               </el-col>
               <el-col :span="8">
-                <el-tooltip class="item" effect="dark" content="达到该上限值，则停止买入XRP，按照CNY计算" placement="right">
+                <el-tooltip class="item" effect="dark" content="XRP达到该上限值，则停止买入XRP（按照CNY计算，即实际的XRP上限值为 你设置的XRP上限值/sellPrice ）" placement="right">
                   <el-button>XRP上限(CNY)：</el-button>
                 </el-tooltip>
                 <el-input v-model="limitXRP" placeholder="XRP上限"></el-input>
