@@ -425,7 +425,7 @@ export default {
             return Promise.all(this.orders.map((val, index) => {
               if (val.order_type === 'buy') {
                 // 取消超出范围的买单
-                if (this.fixNum(val.price, 3) < this.fixNum(buyPrice, 3)) {
+                if (this.fixNum(val.price, 2) < this.fixNum(buyPrice, 2)) {
                   this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
                     let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                     return this.api.submit(tmp.signedTransaction)
@@ -443,7 +443,7 @@ export default {
                 }
               } else {
                 // 取消超出范围的卖单
-                if (this.fixNum(val.price, 3) > this.fixNum(sellPrice, 3)) {
+                if (this.fixNum(val.price, 2) > this.fixNum(sellPrice, 2)) {
                   this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
                     let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                     return this.api.submit(tmp.signedTransaction)
