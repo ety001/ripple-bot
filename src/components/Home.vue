@@ -480,7 +480,7 @@ export default {
                 })
               } else if (tmpBuyOrders.length === 0) {
                 // 下买单
-                return this.buyOrder()
+                this.buyOrder()
               }
               if (tmpSellOrders.length > 1) {
                 // 处理多于一个的订单
