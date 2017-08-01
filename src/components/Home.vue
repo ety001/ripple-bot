@@ -240,8 +240,8 @@ export default {
       sequence: 0,
       ledgerSequence: 0,
       orders: [],
-      buyOrderNum: 0,
-      sellOrderNum: 0,
+      buyOrders: [],
+      sellOrders: [],
       donor: 'r4ff6mjZ1Huznci4ZQXZZ6V7ZU7yt9S6ha'
     }
   },
@@ -385,21 +385,22 @@ export default {
         this.api.getOrders(this.myAddress).then(offers => {
           this.console(['current_account_offers', offers])
           this.orders = []
-          this.buyOrderNum = 0
-          this.sellOrderNum = 0
+          this.buyOrders = []
+          this.sellOrders = []
           if (offers.length > 0) {
             return Promise.all(offers.map((row, index) => {
               return new Promise((resolve1, reject1) => {
-                this.orders.push({
+                let order = {
                   seq: row.properties.sequence,
                   amount: this.fixNum(row.specification.quantity.value, 5),
                   order_type: row.specification.direction,
                   price: this.fixNum(row.specification.direction === 'buy' ? 1 / row.properties.makerExchangeRate : row.properties.makerExchangeRate, 5)
-                })
+                }
+                this.orders.push(order)
                 if (row.specification.direction === 'buy') {
-                  this.buyOrderNum ++
+                  this.buyOrders.push(order)
                 } else {
-                  this.sellOrderNum ++
+                  this.sellOrders.push(order)
                 }
                 resolve1('account_offers'+index)
               })
@@ -414,123 +415,139 @@ export default {
         })
       })
     },
-    robot () {
-      if (this.robotStatus === true) {
-        // 计算买入卖出价格
-        let buyPrice = this.buyPrice * (1 - this.buyRate / 100)
-        let sellPrice = this.sellPrice * (1 + this.sellRate / 100)
-        // 初始化数据
-        let offersLength = this.orders.length
-        let maxBuyOrderSeq = 0
-        let maxSellOrderSeq = 0
-        let tmpBuyOrders = []
-        let tmpSellOrders = []
-        this.console([this.buyOrderNum === 0 && this.sellOrderNum === 0, 'robot1'])
-        if (this.buyOrderNum === 0 && this.sellOrderNum === 0) {
-          return this.buyOrder(true)
-        } else {
-          return new Promise((resolve, reject) => {
-            // 开始处理(先取消订单，再下订单)
-            return Promise.all(this.orders.map((val, index) => {
-              return new Promise((resolve1, reject1) => {
-                if (val.order_type === 'buy') {
-                  // 取消超出范围的买单
-                  if (this.fixNum(val.price, sensitivity) < this.fixNum(buyPrice, sensitivity)) {
-                    resolve1(val, 'buy')
-                  } else {
-                    // 获取最晚的一个seq
-                    if (val.seq > maxBuyOrderSeq) {
-                      maxBuyOrderSeq = val.seq
-                    }
-                    // 未处理订单放到临时数组
-                    tmpBuyOrders.push(val)
-                    resolve1(0)
-                  }
-                } else {
-                  // 取消超出范围的卖单
-                  if (this.fixNum(val.price, sensitivity) > this.fixNum(sellPrice, sensitivity)) {
-                    resolve1(val, 'sell')
-                  } else {
-                    // 获取最晚的一个seq
-                    if (val.seq > maxSellOrderSeq) {
-                      maxSellOrderSeq = val.seq
-                    }
-                    // 未处理订单放到临时数组
-                    tmpSellOrders.push(val)
-                  }
+    buyRobot () {
+      this.console('buy_robot')
+      return new Promise((resolve, reject) => {
+        this.console(['robotStatus', this.robotStatus])
+        if (this.robotStatus === true) {
+          // 计算买入卖出价格
+          let buyPrice = this.buyPrice * (1 - this.buyRate / 100)
+          // 初始化数据
+          let maxBuyOrderSeq = 0
+          let tmpBuyOrders = []
+          // 开始处理(先取消订单，再下订单)
+          return Promise.all(this.buyOrders.map((val, index) => {
+            return new Promise((resolve1, reject1) => {
+              // 取消超出范围的买单
+              if (this.fixNum(val.price, sensitivity) < this.fixNum(buyPrice, sensitivity)) {
+                this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
+                  let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+                  return this.api.submit(tmp.signedTransaction)
+                }).then(res => {
+                  this.console(['Cancel Seq ' + val.seq + ',Reason: price change(' + this.fixNum(val.price, sensitivity) + ',' + this.fixNum(buyPrice, sensitivity) + '), Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res], 'msg')
+                  resolve1('cancel_buy_order:'+val.seq)
+                })
+              } else {
+                // 获取最晚的一个seq
+                if (val.seq > maxBuyOrderSeq) {
+                  maxBuyOrderSeq = val.seq
                 }
-              }).then((val, type) => {
-                if (val === 0) {
-                  resolve(0)
-                }
-                if (type === 'buy') {
-                  this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
-                    let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
-                    return this.api.submit(tmp.signedTransaction)
-                  }).then(res => {
-                    this.buyOrderNum --
-                    this.console(['Cancel Seq ' + val.seq + ',Reason: price change(' + this.fixNum(val.price, sensitivity) + ',' + this.fixNum(buyPrice, sensitivity) + '), Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res], 'msg')
-                    resolve(0)
-                  })
-                }
-                else if (type === 'sell') {
-                  this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
-                    let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
-                    return this.api.submit(tmp.signedTransaction)
-                  }).then(res => {
-                    this.sellOrderNum --
-                    this.console(['Cancel Seq ' + val.seq + ',Reason: price change(' + this.fixNum(val.price, sensitivity) + ',' + this.fixNum(sellPrice, sensitivity) + ') Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res], 'msg')
-                    resolve(0)
-                  })
-                }
-              })
-            })).then(res => {
-              if (tmpBuyOrders.length !== 1 || tmpSellOrders.length !== 1) {
-                this.console(['Get in last foreach:', tmpBuyOrders, tmpSellOrders, maxBuyOrderSeq, maxSellOrderSeq])
+                // 未处理订单放到临时数组
+                tmpBuyOrders.push(val)
+                resolve1(0)
               }
-              if (tmpBuyOrders.length > 1) {
-                // 处理多于一个的订单
-                tmpBuyOrders.forEach((subVal, subIndex) => {
+            })
+          })).then((buyOrdersRes) => {
+            this.console(['buy_orders_res', buyOrdersRes])
+            if (tmpBuyOrders.length > 1) {
+              this.console('tmp_buy_order_length > 1')
+              // 处理多于一个的订单
+              Promise.all(tmpBuyOrders.map((subVal, subIndex) => {
+                return new Promise((resolve1, reject1) => {
                   if (parseInt(subVal.seq) !== parseInt(maxBuyOrderSeq)) {
                     this.api.prepareOrderCancellation(this.myAddress, {orderSequence: subVal.seq}, myInstructions).then(prepared => {
                       let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                       return this.api.submit(tmp.signedTransaction)
                     }).then(res => {
-                      this.buyOrderNum --
                       this.console(['Cancel Seq ' + subVal.seq + ',Reason: order num > 1, Order Amount: ' + subVal.amount + ', Price: ' + subVal.price + ', Order Type:' + subVal.order_type, res], 'msg')
+                      resolve1('cancel_buy_order1:'+subVal.seq)
                     })
                   }
                 })
-              } else if (tmpBuyOrders.length === 0) {
-                // 下买单
-                this.buyOrder()
+              })).then((tmpBuyOrdersRes) => {
+                this.console(['tmp_buy_orders_res', tmpBuyOrdersRes])
+                resolve()
+              })
+            } else if (tmpBuyOrders.length === 0) {
+              // 下买单
+              let buyOrderRes = this.buyOrder()
+              this.console(['tmp_buy_order_length == 0', buyOrderRes])
+              resolve(buyOrderRes)
+            } else {
+              resolve()
+            }
+          })
+        } else {
+          resolve()
+        }
+      })
+    },
+    sellRobot () {
+      this.console('sell_robot')
+      return new Promise((resolve, reject) => {
+        this.console(['robotStatus', this.robotStatus])
+        if (this.robotStatus === true) {
+          // 计算买入卖出价格
+          let sellPrice = this.sellPrice * (1 + this.sellRate / 100)
+          // 初始化数据
+          let maxSellOrderSeq = 0
+          let tmpSellOrders = []
+          // 开始处理(先取消订单，再下订单)
+          return Promise.all(this.sellOrders.map((val, index) => {
+            return new Promise((resolve1, reject1) => {
+              // 取消超出范围的卖单
+              if (this.fixNum(val.price, sensitivity) > this.fixNum(sellPrice, sensitivity)) {
+                this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
+                  let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
+                  return this.api.submit(tmp.signedTransaction)
+                }).then(res => {
+                  this.console(['Cancel Seq ' + val.seq + ',Reason: price change(' + this.fixNum(val.price, sensitivity) + ',' + this.fixNum(sellPrice, sensitivity) + ') Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res], 'msg')
+                  resolve1('cancel_sell_order:'+val.seq)
+                })
+              } else {
+                // 获取最晚的一个seq
+                if (val.seq > maxSellOrderSeq) {
+                  maxSellOrderSeq = val.seq
+                }
+                // 未处理订单放到临时数组
+                tmpSellOrders.push(val)
+                resolve1(0)
               }
-              if (tmpSellOrders.length > 1) {
-                // 处理多于一个的订单
-                tmpSellOrders.forEach((subVal, subIndex) => {
-                  if (subVal.seq !== maxSellOrderSeq) {
+            })
+          })).then((sellOrdersRes) => {
+            this.console(['sell_orders_res', sellOrdersRes])
+            if (tmpSellOrders.length > 1) {
+              // 处理多于一个的订单
+              Promise.all(tmpSellOrders.map((subVal, subIndex) => {
+                return new Promise((resolve1, reject1) => {
+                  if (parseInt(subVal.seq) !== parseInt(maxSellOrderSeq)) {
                     this.api.prepareOrderCancellation(this.myAddress, {orderSequence: subVal.seq}, myInstructions).then(prepared => {
                       let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                       return this.api.submit(tmp.signedTransaction)
                     }).then(res => {
-                      this.sellOrderNum --
                       this.console(['Cancel Seq ' + subVal.seq + ',Reason: order num > 1, Order Amount: ' + subVal.amount + ', Price: ' + subVal.price + ', Order Type:' + subVal.order_type, res], 'msg')
+                      resolve1('cancel_sell_order1:'+subVal.seq)
                     })
                   }
                 })
-              } else if (tmpSellOrders.length === 0) {
-                // 下卖单
-                this.sellOrder()
-              }
-            })
+              })).then((tmpSellOrdersRes) => {
+                this.console(['tmp_sell_orders_res', tmpSellOrdersRes])
+                resolve()
+              })
+            } else if (tmpSellOrders.length === 0) {
+              // 下卖单
+              let sellOrderRes = this.sellOrder()
+              resolve(sellOrderRes)
+            } else {
+              resolve()
+            }
           })
+        } else {
+          resolve()
         }
-      }
+      })
     },
-    buyOrder (tag=false) {
-      if (tag === true) {
-        this.sellOrder()
-      }
+    buyOrder () {
       // 如果拥有的xrp大于限定值，则不买进
       if (parseFloat(this.myXRP) >= parseFloat(this.limitXRP / this.sellPrice)) {
         this.console(['myXRP > limitXRP / sellPrice', parseFloat(this.myXRP), parseFloat(this.limitXRP / this.sellPrice)])
@@ -561,10 +578,10 @@ export default {
       this.console(order)
       return new Promise((resolve, reject) => {
         this.api.prepareOrder(this.myAddress, order, myInstructions).then(prepared => {
-          this.console(['buy:', prepared])
+          this.console(['buy_prepared:', prepared])
           let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
           seq = prepared.instructions.sequence
-          this.console(['buy:', tmp])
+          this.console(['buy_signed:', tmp])
           return this.api.submit(tmp.signedTransaction)
         }).then(res => {
           this.orders.push({
@@ -573,7 +590,6 @@ export default {
             order_type: 'buy',
             price: this.fixNum(buyPrice, 5)
           })
-          this.buyOrderNum ++
           this.console(['Create Buy Order, Buy ' + xrpVal + ' XRP, Price: ' + buyPrice, res], 'msg')
           return true
         }).then(() => {
@@ -639,7 +655,12 @@ export default {
           return this.accountOffers()
         }).then((offersRes) => {
           this.console(['update offers', offersRes])
-          return this.robot()
+          return this.buyRobot()
+        }).then((buyRobotRes) => {
+          this.console(['buy_robot_finish', buyRobotRes])
+          return this.sellRobot()
+        }).then((sellRobotRes) => {
+          this.console(['sell_robot_finish', sellRobotRes])
         }).catch(err => {
           console.error(err)
         })
