@@ -321,36 +321,40 @@ export default {
           this.asks = []
           this.bids = []
 
-          Promise.all(asks.map((row, index) => {
-            if (index === 0) {
-              this.sellPrice = this.fixNum(row.properties.makerExchangeRate, 5)
-            }
-            this.asks.push({
-              'amount': this.fixNum(row.specification.quantity.value, 5),
-              'price': this.fixNum(row.properties.makerExchangeRate, 5),
-              'atype': 'Sell',
-              'account': row.properties.maker
-            })
-            return true
-          })).then((asksResult) => {
-            this.console('asks result update')
-            Promise.all(bids.map((row, index) => {
+          return Promise.all(asks.map((row, index) => {
+            return new Promise((resolve1, reject1) => {
               if (index === 0) {
-                this.buyPrice = this.fixNum(1/row.properties.makerExchangeRate, 5)
+                this.sellPrice = this.fixNum(row.properties.makerExchangeRate, 5)
               }
-              this.bids.push({
+              this.asks.push({
                 'amount': this.fixNum(row.specification.quantity.value, 5),
-                'price': this.fixNum(1/row.properties.makerExchangeRate, 5),
-                'atype': 'Buy',
+                'price': this.fixNum(row.properties.makerExchangeRate, 5),
+                'atype': 'Sell',
                 'account': row.properties.maker
               })
-              return true
-            })).then((bidsResult) => {
-              this.console('bids result update')
-              resolve(bidsResult)
-            }).catch((err) => {
-              console.error(err)
-            })
+              resolve1('asks:'+index)
+            });
+          })).then((asksResult) => {
+            this.console(['asks result update', asksResult])
+            return Promise.all(bids.map((row, index) => {
+              return new Promise((resolve1, reject1) => {
+                if (index === 0) {
+                  this.buyPrice = this.fixNum(1/row.properties.makerExchangeRate, 5)
+                }
+                this.bids.push({
+                  'amount': this.fixNum(row.specification.quantity.value, 5),
+                  'price': this.fixNum(1/row.properties.makerExchangeRate, 5),
+                  'atype': 'Buy',
+                  'account': row.properties.maker
+                })
+                resolve1('bids:'+index)
+              })
+            }))
+          }).then((bidsResult) => {
+            this.console(['bids result update', bidsResult])
+            resolve(bidsResult)
+          }).catch((err) => {
+            console.error(err, 'orderbook')
           })
         })
       })
@@ -358,14 +362,16 @@ export default {
     updateBalance () {
       return new Promise((resove, reject) => {
         this.api.getBalances(this.myAddress).then(balances =>{
-          return Promise.all(balances.map((row) => {
-            if (row.currency === 'XRP') {
-              this.myXRP = this.fixNum(row.value, 5)
-            }
-            if (row.currency === 'CNY') {
-              this.myCNY = this.fixNum(row.value, 5)
-            }
-            return true
+          return Promise.all(balances.map((row, i) => {
+            return new Promise((resove1, reject1) => {
+              if (row.currency === 'XRP') {
+                this.myXRP = this.fixNum(row.value, 5)
+              }
+              if (row.currency === 'CNY') {
+                this.myCNY = this.fixNum(row.value, 5)
+              }
+              resove1('true' + i)
+            })
           }))
         }).then((result) => {
           resove(result)
@@ -377,24 +383,26 @@ export default {
     accountOffers () {
       return new Promise((resolve, reject) => {
         this.api.getOrders(this.myAddress).then(offers => {
-          this.console(offers)
+          this.console(['current_account_offers', offers])
           this.orders = []
           this.buyOrderNum = 0
           this.sellOrderNum = 0
           if (offers.length > 0) {
-            return Promise.all(offers.map((row) => {
-              this.orders.push({
-                seq: row.properties.sequence,
-                amount: this.fixNum(row.specification.quantity.value, 5),
-                order_type: row.specification.direction,
-                price: this.fixNum(row.specification.direction === 'buy' ? 1 / row.properties.makerExchangeRate : row.properties.makerExchangeRate, 5)
+            return Promise.all(offers.map((row, index) => {
+              return new Promise((resolve1, reject1) => {
+                this.orders.push({
+                  seq: row.properties.sequence,
+                  amount: this.fixNum(row.specification.quantity.value, 5),
+                  order_type: row.specification.direction,
+                  price: this.fixNum(row.specification.direction === 'buy' ? 1 / row.properties.makerExchangeRate : row.properties.makerExchangeRate, 5)
+                })
+                if (row.specification.direction === 'buy') {
+                  this.buyOrderNum ++
+                } else {
+                  this.sellOrderNum ++
+                }
+                resolve1('account_offers'+index)
               })
-              if (row.specification.direction === 'buy') {
-                this.buyOrderNum ++
-              } else {
-                this.sellOrderNum ++
-              }
-              return true
             })).then((res) => {
               resolve(res)
             }).catch((err) => {
@@ -424,43 +432,58 @@ export default {
           return new Promise((resolve, reject) => {
             // 开始处理(先取消订单，再下订单)
             return Promise.all(this.orders.map((val, index) => {
-              if (val.order_type === 'buy') {
-                // 取消超出范围的买单
-                if (this.fixNum(val.price, sensitivity) < this.fixNum(buyPrice, sensitivity)) {
+              return new Promise((resolve1, reject1) => {
+                if (val.order_type === 'buy') {
+                  // 取消超出范围的买单
+                  if (this.fixNum(val.price, sensitivity) < this.fixNum(buyPrice, sensitivity)) {
+                    resolve1(val, 'buy')
+                  } else {
+                    // 获取最晚的一个seq
+                    if (val.seq > maxBuyOrderSeq) {
+                      maxBuyOrderSeq = val.seq
+                    }
+                    // 未处理订单放到临时数组
+                    tmpBuyOrders.push(val)
+                    resolve1(0)
+                  }
+                } else {
+                  // 取消超出范围的卖单
+                  if (this.fixNum(val.price, sensitivity) > this.fixNum(sellPrice, sensitivity)) {
+                    resolve1(val, 'sell')
+                  } else {
+                    // 获取最晚的一个seq
+                    if (val.seq > maxSellOrderSeq) {
+                      maxSellOrderSeq = val.seq
+                    }
+                    // 未处理订单放到临时数组
+                    tmpSellOrders.push(val)
+                  }
+                }
+              }).then((val, type) => {
+                if (val === 0) {
+                  resolve(0)
+                }
+                if (type === 'buy') {
                   this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
                     let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                     return this.api.submit(tmp.signedTransaction)
                   }).then(res => {
                     this.buyOrderNum --
                     this.console(['Cancel Seq ' + val.seq + ',Reason: price change(' + this.fixNum(val.price, sensitivity) + ',' + this.fixNum(buyPrice, sensitivity) + '), Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res], 'msg')
+                    resolve(0)
                   })
-                } else {
-                  // 获取最晚的一个seq
-                  if (val.seq > maxBuyOrderSeq) {
-                    maxBuyOrderSeq = val.seq
-                  }
-                  // 未处理订单放到临时数组
-                  tmpBuyOrders.push(val)
                 }
-              } else {
-                // 取消超出范围的卖单
-                if (this.fixNum(val.price, sensitivity) > this.fixNum(sellPrice, sensitivity)) {
+                else if (type === 'sell') {
                   this.api.prepareOrderCancellation(this.myAddress, {orderSequence: val.seq}, myInstructions).then(prepared => {
                     let tmp = this.api.sign(prepared.txJSON, this.primaryKey)
                     return this.api.submit(tmp.signedTransaction)
                   }).then(res => {
                     this.sellOrderNum --
                     this.console(['Cancel Seq ' + val.seq + ',Reason: price change(' + this.fixNum(val.price, sensitivity) + ',' + this.fixNum(sellPrice, sensitivity) + ') Order Amount: ' + val.amount + ', Price: ' + val.price + ', Order Type:' + val.order_type, res], 'msg')
+                    resolve(0)
                   })
-                } else {
-                  // 获取最晚的一个seq
-                  if (val.seq > maxSellOrderSeq) {
-                    maxSellOrderSeq = val.seq
-                  }
-                  // 未处理订单放到临时数组
-                  tmpSellOrders.push(val)
                 }
-              }
+              })
             })).then(res => {
               if (tmpBuyOrders.length !== 1 || tmpSellOrders.length !== 1) {
                 this.console(['Get in last foreach:', tmpBuyOrders, tmpSellOrders, maxBuyOrderSeq, maxSellOrderSeq])
@@ -497,9 +520,8 @@ export default {
                 })
               } else if (tmpSellOrders.length === 0) {
                 // 下卖单
-                return this.sellOrder()
+                this.sellOrder()
               }
-              resolve(res)
             })
           })
         }
@@ -610,13 +632,13 @@ export default {
     intervalFunc () {
       if (this.connectStatus === true) {
         this.updateBalance().then((balancesRes) => {
-          this.console('get balances')
+          this.console(['get balances', balancesRes])
           return this.orderbook()
         }).then((orderbookRes) => {
-          this.console('update orderbook')
+          this.console(['update orderbook', orderbookRes])
           return this.accountOffers()
         }).then((offersRes) => {
-          this.console('update offers')
+          this.console(['update offers', offersRes])
           return this.robot()
         }).catch(err => {
           console.error(err)
