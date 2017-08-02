@@ -210,7 +210,7 @@ const checkOrderIntervalTime = 1
 const bookLimit = 20
 const ledgerOffset = 500
 const myInstructions = {maxLedgerVersionOffset: ledgerOffset}
-const sensitivity = 1
+const sensitivity = 2
 export default {
   name: 'home',
   data () {
